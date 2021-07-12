@@ -6,9 +6,17 @@ library(leaflet)
 library(readxl)
 library(echarts4r)
 library(shiny)
+library(shinyalert)
+library(katexR)
+library(bslib)
+
+theme <- bs_theme(
+    bg = "#000000", fg = "#B8BCC2",
+    "input-border-color" = "#a6a6a6"
+)
 
 # Datos
-shp_mex <- read_sf("México_Estados/México_Estados.shp")
+shp_mex <- read_sf("México_Estados/México_Estados.shp")
 ing_mex <- read_excel("ingresos_mex.xlsx")
 
 # Uniendo las bases
@@ -25,6 +33,8 @@ mytext <- paste(
     lapply(htmltools::HTML)
 
 ui <- bootstrapPage(
+    theme = theme,
+    useShinyalert(),
     tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
     leafletOutput("map", width = "100%", height = "100%"),
     absolutePanel(top = 10, right = 10,
@@ -42,7 +52,8 @@ ui <- bootstrapPage(
                                 "Decil 9" = "Decil 9",
                                 "Decil 10" = "Decil 10")),
                   echarts4rOutput('hist_plot', height = '350px', width = '400px'),
-                  echarts4rOutput('pie', height = '300px', width = '350px')
+                  echarts4rOutput('pie', height = '300px', width = '350px'),
+                  div(style = "display:inline-block; float:right", actionButton("do", icon = icon( "info"), label = ""  ))
     )
 )
 
@@ -103,12 +114,40 @@ server <- function(input, output, session) {
     output$pie <- renderEcharts4r({
         dato2() |> 
             e_charts(ESTADO) |>
-            e_pie(nuevo2, name = "Porcentaje (top 8)" ) |>
+            e_pie(nuevo2, name = "Porcentaje (top 8)", radius = c("50%", "83%") ) |>
             e_tooltip(trigger = "item") |> 
             e_legend(FALSE) |> 
             e_color(color = c("#0466c8", "#0353a4","#023e7d","#002855","#001845",
                               "#001233","#33415c","#5c677d","#7d8597", "979dac")) 
     })
+    
+    observeEvent(input$do, {
+        shinyalert(
+            title = "Los ingresos en México por deciles",
+            text = p("Esta app considera los ingresos en México, desde el más bajo 
+      hasta el más alto. Los deciles consideran una serie de datos ordenados 
+      de menor a mayor, los cuales consideran un 10% de la información por cada
+      decil. Los deciles se pueden calcular mediante la fórmula siguiente:", hr(katex("D_1= \\frac{(n+1)}{100}, \\, D_2= \\frac{50(n+1)}{100}, \\, D_3= \\frac{99(n+1)}{100}")), 
+                     hr("O bien, para datos no agrupados, usaríamos la expresión:"), 
+                     hr(katex("Q_n , D_n , P_n = L_i + [\\frac{f_{Qn}, D_n, P_n, - f_a}{f_{Q,D,P}}]*C ")), 
+                     hr("Por su parte, el histograma nos muestra la forma en la que se distribuyen los ingresos por decil, utilizando
+                  la regla de Friedman-Diaconis para el número de intervalos. El gráfico de pastel
+                  nos muestra un top 8 de los estados que representan un ingreso más alto por decil.") ),
+            size = "m",
+            closeOnEsc = TRUE,
+            closeOnClickOutside = TRUE,
+            html = TRUE,
+            type = "info",
+            showConfirmButton = TRUE,
+            showCancelButton = FALSE,
+            confirmButtonText = "OK",
+            confirmButtonCol = "#AEDEF4",
+            timer = 0,
+            imageUrl = "",
+            animation = TRUE
+        )
+    })
+    
 }
 
 shinyApp(ui, server)
